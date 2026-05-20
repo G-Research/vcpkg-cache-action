@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+
+  test:
+    if: github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: TypeScript compile and bundle
+        run: npm run build
+
+      - name: Check dist is up to date
+        run: |
+          git diff --exit-code dist/ || {
+            echo "dist/ is out of date. Run 'npm run build' and commit the result."
+            exit 1
+          }
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Python syntax check
+        run: uv run python -m py_compile main.py && uv run python -m py_compile proxy.py
+
+  all-required-checks-done:
+    name: All required checks done
+    needs:
+      - test
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All required checks done"
